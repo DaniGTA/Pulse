@@ -37,8 +37,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-import eves.de.pulse.dialog.BpmDialog;
-import eves.de.pulse.dialog.ConfigDialog;
+//import eves.de.pulse.dialog.BpmDialog;
+//import eves.de.pulse.dialog.ConfigDialog;
 import eves.de.pulse.view.BpmView;
 import eves.de.pulse.view.PulseView;
 
@@ -79,7 +79,7 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
             switch (status){
                 case BaseLoaderCallback.SUCCESS:{
                     javaCameraView.enableView();
-                    //loaderCallbackSuccess();
+                    loaderCallbackSuccess();
                     break;
                 }
                 default:{
@@ -154,22 +154,56 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         javaCameraView = findViewById(R.id.java_camera_view);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
+
+        bpmView = (BpmView) findViewById(R.id.bpm);
+        bpmView.setBackgroundColor(Color.DKGRAY);
+        bpmView.setTextColor(Color.LTGRAY);
+
+        pulseView = findViewById(R.id.pulse);
+
+        faceBoxPaint = initFaceBoxPaint();
+        faceBoxTextPaint = initFaceBoxTextPaint();
+
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+
+        initFaceDetection = savedInstanceState.getBoolean(FACE_DETECTION, initFaceDetection);
+        initMagnification = savedInstanceState.getBoolean(MAGNIFICATION, initMagnification);
+        initMagnificationFactor = savedInstanceState.getInt(MAGNIFICATION_FACTOR, initMagnificationFactor);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        // if OpenCV Manager is not installed, pulse hasn't loaded
+        if (pulse != null) {
+            outState.putBoolean(FACE_DETECTION, pulse.hasFaceDetection());
+            outState.putBoolean(MAGNIFICATION, pulse.hasMagnification());
+            outState.putInt(MAGNIFICATION_FACTOR, pulse.getMagnificationFactor());
+        }
     }
 
     @Override
     protected void onPause(){
-        super.onPause();
+        bpmView.setNoBpm();
+        pulseView.setNoPulse();
         if(javaCameraView != null) {
             javaCameraView.disableView();
         }
+
+        super.onPause();
     }
 
     @Override
     protected void onDestroy(){
-        super.onDestroy();
         if (javaCameraView != null){
             javaCameraView.disableView();
         }
+        super.onDestroy();
     }
 
     @Override
@@ -201,18 +235,49 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        mRgba = inputFrame.rgba();
-        Mat motion = mRgba.clone();
+        pulse.onFrame(inputFrame.rgba());
+        return inputFrame.rgba();
+    }
 
-        if(oldFrame != null) {
-            Core.absdiff(oldFrame,mRgba,motion);
-            //Imgproc.threshold(motion,motion,80,255, Imgproc.THRESH_BINARY);
-            //Imgproc.erode(motion, motion, Imgproc.getStructuringElement(Imgproc.MORPH_RECT,new Size(4,4)));
-        }
+    private Paint initFaceBoxPaint() {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(Color.WHITE);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(4);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        p.setStrokeJoin(Paint.Join.ROUND);
+        p.setShadowLayer(2, 0, 0, Color.BLACK);
+        return p;
+    }
 
+    private Paint initFaceBoxTextPaint() {
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(Color.WHITE);
+        p.setShadowLayer(2, 0, 0, Color.DKGRAY);
+        p.setTextAlign(Paint.Align.CENTER);
+        p.setTextSize(20f);
+        return p;
+    }
 
-
-        oldFrame = mRgba.clone();
-        return motion;
+    private Path createFaceBoxPath(Rect box) {
+        float size = box.width * 0.25f;
+        Path path = new Path();
+        // top left
+        path.moveTo(box.x, box.y + size);
+        path.lineTo(box.x, box.y);
+        path.lineTo(box.x + size, box.y);
+        // top right
+        path.moveTo(box.x + box.width, box.y + size);
+        path.lineTo(box.x + box.width, box.y);
+        path.lineTo(box.x + box.width - size, box.y);
+        // bottom left
+        path.moveTo(box.x, box.y + box.height - size);
+        path.lineTo(box.x, box.y + box.height);
+        path.lineTo(box.x + size, box.y + box.height);
+        // bottom right
+        path.moveTo(box.x + box.width, box.y + box.height - size);
+        path.lineTo(box.x + box.width, box.y + box.height);
+        path.lineTo(box.x + box.width - size, box.y + box.height);
+        return path;
     }
 }

@@ -42,7 +42,6 @@ public class BpmView extends AppCompatTextView {
         setNoBpm();
 
         setTextSize(TypedValue.COMPLEX_UNIT_FRACTION_PARENT, 60f);
-        setTypeface(Typeface.createFromAsset(getContext().getAssets(), "fonts/ds_digital/DS-DIGIB.TTF"));
         setGravity(Gravity.CENTER);
 
         circlePaint = initCirclePaint();

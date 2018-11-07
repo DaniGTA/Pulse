@@ -21,5 +21,14 @@
         android:layout_height="wrap_content"
         android:visibility="gone" />
 
+    <eves.de.pulse.view.BpmView
+        android:text="bpm: 0"
+        android:id="@+id/bpm"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+    <eves.de.pulse.view.PulseView
+        android:id="@+id/pulse"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </android.support.constraint.ConstraintLayout>
