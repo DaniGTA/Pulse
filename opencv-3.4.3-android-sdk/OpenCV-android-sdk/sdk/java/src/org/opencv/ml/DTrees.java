@@ -3,9 +3,7 @@
 //
 package org.opencv.ml;
 
-import java.lang.String;
 import org.opencv.core.Mat;
-import org.opencv.ml.DTrees;
 import org.opencv.ml.StatModel;
 
 // C++: class DTrees

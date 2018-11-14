@@ -4,54 +4,60 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.ImageDecoder;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Typeface;
-import android.hardware.camera2.params.Face;
-import android.os.Build;
+import android.net.Uri;
+import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.SurfaceView;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
-import org.opencv.android.CameraRenderer;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.Objdetect;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
+
+//import eves.de.pulse.view.BpmView;
+//import eves.de.pulse.view.PulseView;
+
+import static org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY;
+import static org.opencv.imgproc.Imgproc.cvtColor;
+import static org.opencv.imgproc.Imgproc.equalizeHist;
+import static org.opencv.objdetect.Objdetect.CASCADE_SCALE_IMAGE;
 
 //import eves.de.pulse.dialog.BpmDialog;
 //import eves.de.pulse.dialog.ConfigDialog;
-import eves.de.pulse.view.BpmView;
-import eves.de.pulse.view.PulseView;
-
-import static org.opencv.core.CvType.CV_8UC3;
 
 public class Startsite extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
 
     private static String TAG = "Startsite";
     JavaCameraView javaCameraView;
 
-    private BpmView bpmView;
-    private PulseView pulseView;
-    private Pulse pulse;
+    //private BpmView bpmView;
+    //private PulseView pulseView;
+    //private Pulse pulse;
 
     private Paint faceBoxPaint;
     private Paint faceBoxTextPaint;
@@ -63,15 +69,15 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
     //private BpmDialog bpmDialog;
     private double recordedBpmAverage;
 
-    private static final String CAMERA_ID = "camera-id";
-    private static final String FPS_METER = "fps-meter";
-    private static final String FACE_DETECTION = "face-detection";
-    private static final String MAGNIFICATION = "magnification";
-    private static final String MAGNIFICATION_FACTOR = "magnification-factor";
+    //private static final String CAMERA_ID = "camera-id";
+    //private static final String FPS_METER = "fps-meter";
+    //private static final String FACE_DETECTION = "face-detection";
+    //private static final String MAGNIFICATION = "magnification";
+    //private static final String MAGNIFICATION_FACTOR = "magnification-factor";
 
-    private boolean initFaceDetection = true;
-    private boolean initMagnification = true;
-    private int initMagnificationFactor = 100;
+    //private boolean initFaceDetection = true;
+    //private boolean initMagnification = true;
+    //private int initMagnificationFactor = 100;
 
     BaseLoaderCallback mLoaderCallBack = new BaseLoaderCallback(this) {
         @Override
@@ -99,22 +105,6 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
     }
 
     private void loaderCallbackSuccess() {
-        System.loadLibrary("pulse");
-
-        pulse = new Pulse();
-        pulse.setFaceDetection(initFaceDetection);
-        pulse.setMagnification(initMagnification);
-        pulse.setMagnificationFactor(initMagnificationFactor);
-
-        File dir = getDir("cascade", Context.MODE_PRIVATE);
-
-
-        File file = createFileFromResource(dir, R.raw.lbpcascade_frontalface, "xml");
-        pulse.load(file.getAbsolutePath());
-        dir.delete();
-
-        pulseView.setGridSize(pulse.getMaxSignalSize());
-
         javaCameraView.enableView();
     }
 
@@ -155,24 +145,20 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCvCameraViewListener(this);
 
-        bpmView = (BpmView) findViewById(R.id.bpm);
-        bpmView.setBackgroundColor(Color.DKGRAY);
-        bpmView.setTextColor(Color.LTGRAY);
+        //bpmView = (BpmView) findViewById(R.id.bpm);
+        //bpmView.setBackgroundColor(Color.DKGRAY);
+        //bpmView.setTextColor(Color.LTGRAY);
 
-        pulseView = findViewById(R.id.pulse);
-
-        faceBoxPaint = initFaceBoxPaint();
-        faceBoxTextPaint = initFaceBoxTextPaint();
-
+        //pulseView = findViewById(R.id.pulse);
     }
 
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
 
-        initFaceDetection = savedInstanceState.getBoolean(FACE_DETECTION, initFaceDetection);
-        initMagnification = savedInstanceState.getBoolean(MAGNIFICATION, initMagnification);
-        initMagnificationFactor = savedInstanceState.getInt(MAGNIFICATION_FACTOR, initMagnificationFactor);
+        //initFaceDetection = savedInstanceState.getBoolean(FACE_DETECTION, initFaceDetection);
+        //initMagnification = savedInstanceState.getBoolean(MAGNIFICATION, initMagnification);
+        //initMagnificationFactor = savedInstanceState.getInt(MAGNIFICATION_FACTOR, initMagnificationFactor);
     }
 
     @Override
@@ -180,17 +166,19 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         super.onSaveInstanceState(outState);
 
         // if OpenCV Manager is not installed, pulse hasn't loaded
+        /*
         if (pulse != null) {
             outState.putBoolean(FACE_DETECTION, pulse.hasFaceDetection());
             outState.putBoolean(MAGNIFICATION, pulse.hasMagnification());
             outState.putInt(MAGNIFICATION_FACTOR, pulse.getMagnificationFactor());
         }
+        */
     }
 
     @Override
     protected void onPause(){
-        bpmView.setNoBpm();
-        pulseView.setNoPulse();
+        //bpmView.setNoBpm();
+        //pulseView.setNoPulse();
         if(javaCameraView != null) {
             javaCameraView.disableView();
         }
@@ -222,10 +210,38 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
     Mat mIntermediateMat;
     Mat oldFrame;
 
+    CascadeClassifier haarcascade_frontalface = new CascadeClassifier();
+    private int absoluteFaceSize = 0;
+
     @Override
     public void onCameraViewStarted(int width, int height) {
         mRgba = new Mat(height,width,CvType.CV_8UC4);
         mIntermediateMat = new Mat();
+        loadRessource();
+    }
+
+    private void loadRessource(){
+        try {
+            // load cascade file from application resources
+            InputStream is = getResources().openRawResource(
+                    R.raw.lbpcascade_frontalface);
+            File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+            File mCascadeFile = new File(cascadeDir,
+                    "lbpcascade_frontalface.xml");
+            FileOutputStream os = new FileOutputStream(mCascadeFile);
+
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+            is.close();
+            os.close();
+
+            haarcascade_frontalface.load(mCascadeFile.getAbsolutePath());
+        }catch (IOException e){
+            Log.i(TAG,"Failed to load ressource");
+        }
     }
 
     @Override
@@ -235,49 +251,42 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        pulse.onFrame(inputFrame.rgba());
-        return inputFrame.rgba();
+        Mat input = inputFrame.rgba().clone();
+
+        if(!haarcascade_frontalface.empty()) {
+            detectAndDisplay(input);
+        }
+        return input;
     }
 
-    private Paint initFaceBoxPaint() {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(Color.WHITE);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(4);
-        p.setStrokeCap(Paint.Cap.ROUND);
-        p.setStrokeJoin(Paint.Join.ROUND);
-        p.setShadowLayer(2, 0, 0, Color.BLACK);
-        return p;
-    }
+    private void detectAndDisplay(Mat frame)
+    {
+        MatOfRect faces = new MatOfRect();
+        Mat grayFrame = new Mat();
 
-    private Paint initFaceBoxTextPaint() {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(Color.WHITE);
-        p.setShadowLayer(2, 0, 0, Color.DKGRAY);
-        p.setTextAlign(Paint.Align.CENTER);
-        p.setTextSize(20f);
-        return p;
-    }
+        // convert the frame in gray scale
+        Imgproc.cvtColor(frame, grayFrame, Imgproc.COLOR_BGR2GRAY);
+        // equalize the frame histogram to improve the result
+        Imgproc.equalizeHist(grayFrame, grayFrame);
 
-    private Path createFaceBoxPath(Rect box) {
-        float size = box.width * 0.25f;
-        Path path = new Path();
-        // top left
-        path.moveTo(box.x, box.y + size);
-        path.lineTo(box.x, box.y);
-        path.lineTo(box.x + size, box.y);
-        // top right
-        path.moveTo(box.x + box.width, box.y + size);
-        path.lineTo(box.x + box.width, box.y);
-        path.lineTo(box.x + box.width - size, box.y);
-        // bottom left
-        path.moveTo(box.x, box.y + box.height - size);
-        path.lineTo(box.x, box.y + box.height);
-        path.lineTo(box.x + size, box.y + box.height);
-        // bottom right
-        path.moveTo(box.x + box.width, box.y + box.height - size);
-        path.lineTo(box.x + box.width, box.y + box.height);
-        path.lineTo(box.x + box.width - size, box.y + box.height);
-        return path;
+        // compute minimum face size (20% of the frame height, in our case)
+        if (this.absoluteFaceSize == 0)
+        {
+            int height = grayFrame.rows();
+            if (Math.round(height * 0.2f) > 0)
+            {
+                this.absoluteFaceSize = Math.round(height * 0.2f);
+            }
+        }
+
+        // detect faces
+        this.haarcascade_frontalface.detectMultiScale(grayFrame, faces, 1.1, 2, 0 | Objdetect.CASCADE_SCALE_IMAGE,
+                new Size(this.absoluteFaceSize, this.absoluteFaceSize), new Size());
+
+        // each rectangle in faces is a face: draw them!
+        Rect[] facesArray = faces.toArray();
+        for (int i = 0; i < facesArray.length; i++)
+            Imgproc.rectangle(frame, facesArray[i].tl(), facesArray[i].br(), new Scalar(0, 255, 0), 3);
+
     }
 }
