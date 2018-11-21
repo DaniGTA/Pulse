@@ -3,13 +3,14 @@ package eves.de.pulse;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.Paint;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.widget.TextView;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
@@ -26,14 +27,12 @@ import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
-import org.opencv.objdetect.Objdetect;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.List;
 
 //import eves.de.pulse.view.BpmView;
 //import eves.de.pulse.view.PulseView;
@@ -47,31 +46,8 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     private static String TAG = "Startsite";
     JavaCameraView javaCameraView;
-
-    //private BpmView bpmView;
-    //private PulseView pulseView;
-    //private Pulse pulse;
-
-    private Paint faceBoxPaint;
-    private Paint faceBoxTextPaint;
-
-    //private ConfigDialog configDialog;
-
-    private boolean recording = false;
-    private List<Double> recordedBpms;
-    //private BpmDialog bpmDialog;
-    private double recordedBpmAverage;
-
-    //private static final String CAMERA_ID = "camera-id";
-    //private static final String FPS_METER = "fps-meter";
-    //private static final String FACE_DETECTION = "face-detection";
-    //private static final String MAGNIFICATION = "magnification";
-    //private static final String MAGNIFICATION_FACTOR = "magnification-factor";
-
-    //private boolean initFaceDetection = true;
-    //private boolean initMagnification = true;
-    //private int initMagnificationFactor = 100;
-
+    int totalFrameCount = 0;
+    int fps = 0;
     BaseLoaderCallback mLoaderCallBack = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -111,46 +87,46 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
                     new String[]{Manifest.permission.CAMERA},1);
         }
 
+        // Create the Handler object (on the main thread by default)
+        final Handler handler = new Handler();
+        // Define the code block to be executed
+        final Runnable runnableCode = new Runnable() {
+            @Override
+            public void run() {
+                fps = totalFrameCount;
+                TextView fpsTextView = findViewById(R.id.activity_text_show_fps);
+                fpsTextView.setText("FPS: " + fps);
+
+                TextView bpmTextView = findViewById(R.id.activity_text_show_bpm);
+                bpmTextView.setText("BPM: " + Math.round(BPM_RATE));
+
+                totalFrameCount = 0;
+                handler.postDelayed(this,1000);
+            }
+        };
+        // Start the initial runnable task by posting through the handler
+        handler.post(runnableCode);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_startsite);
         javaCameraView = findViewById(R.id.java_camera_view);
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
+        javaCameraView.setCameraIndex(1);
         javaCameraView.setCvCameraViewListener(this);
-
-        //bpmView = (BpmView) findViewById(R.id.bpm);
-        //bpmView.setBackgroundColor(Color.DKGRAY);
-        //bpmView.setTextColor(Color.LTGRAY);
-
-        //pulseView = findViewById(R.id.pulse);
     }
 
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
-
-        //initFaceDetection = savedInstanceState.getBoolean(FACE_DETECTION, initFaceDetection);
-        //initMagnification = savedInstanceState.getBoolean(MAGNIFICATION, initMagnification);
-        //initMagnificationFactor = savedInstanceState.getInt(MAGNIFICATION_FACTOR, initMagnificationFactor);
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-
-        // if OpenCV Manager is not installed, pulse hasn't loaded
-        /*
-        if (pulse != null) {
-            outState.putBoolean(FACE_DETECTION, pulse.hasFaceDetection());
-            outState.putBoolean(MAGNIFICATION, pulse.hasMagnification());
-            outState.putInt(MAGNIFICATION_FACTOR, pulse.getMagnificationFactor());
-        }
-        */
     }
 
     @Override
     protected void onPause(){
-        //bpmView.setNoBpm();
-        //pulseView.setNoPulse();
         if(javaCameraView != null) {
             javaCameraView.disableView();
         }
@@ -180,7 +156,6 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     Mat mRgba;
     Mat mIntermediateMat;
-    Mat oldFrame;
 
     CascadeClassifier haarcascade_frontalface = new CascadeClassifier();
     private int absoluteFaceSize = 0;
@@ -223,6 +198,7 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
+        totalFrameCount++;
         Mat input = inputFrame.rgba().clone();
 
         if(!haarcascade_frontalface.empty()) {
@@ -236,20 +212,18 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         return input;
     }
 
-    byte[] dat;
-    CascadeClassifier faceDetector = new CascadeClassifier();
-    MatOfRect faceDetections = new MatOfRect();
 
 
-    private float FORE_HEAD_DETECTION_PERCENTAGE = 70;
+    private float FORE_HEAD_DETECTION_PERCENTAGE = 40;
     private float FACE_DETECTION_PERCENTAGE = 90;
     private int startAfterFPS = 60;
 
-    ArrayList<Float> poop = new ArrayList();
+    ArrayList<Float> floats = new ArrayList();
     float[] sample;
-    int bufferSize = 128;
+    int bufferSize = 32;
     int sampleRate = bufferSize;
     FFT fft;
+    float BPM_RATE;
 
     private void getHeartRate(Rect rect,Mat mat){
         Point face_start_point = new Point(rect.x + (rect.width * (100 - FACE_DETECTION_PERCENTAGE) / 100), rect.y + (rect.height * (100 - FACE_DETECTION_PERCENTAGE) / 100));
@@ -257,13 +231,9 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         Imgproc.rectangle(mat, face_start_point, face_end_point, new Scalar(0, 255, 0));
         Rect rect_face = new Rect(face_start_point, face_end_point);
 
-               /* Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2GRAY); // Now converted input to gray scale
-                Imgproc.equalizeHist(mat, mat);*/
+        Point start_point = new Point(rect.x + (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 50);
 
-        Mat faceMat = mat.submat(rect_face);
-
-        Point start_point = new Point(rect.x + (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y);
-        Point end_point = new Point((rect.x + rect.width) - (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + rect.height - (2 * rect.height / 3));
+        Point end_point = new Point((rect.x + rect.width) - (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 75);
         Imgproc.rectangle(mat, start_point, end_point, new Scalar(0, 0, 255)); // Drawing Blue Rectangle on forehead.
         Rect rect_fore_head = new Rect(start_point, end_point);
 
@@ -291,13 +261,13 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
         green_avg = green_avg / numPixels;
 //                    System.out.println("Green  Avg :" + green_avg);
-        if (poop.size() < bufferSize) {
-            poop.add(green_avg);
-        } else poop.remove(0);
+        if (floats.size() < bufferSize) {
+            floats.add(green_avg);
+        } else floats.remove(0);
 
-        sample = new float[poop.size()];
-        for (int i = 0; i < poop.size(); i++) {
-            float f = (float) poop.get(i);
+        sample = new float[floats.size()];
+        for (int i = 0; i < floats.size(); i++) {
+            float f = (float) floats.get(i);
             sample[i] = f;
         }
 
@@ -322,8 +292,8 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
             heartBeatFrequency = bw * heartBeatFrequency;
 
-
-            float BPM_RATE = heartBeatFrequency / 60;
+            //float BPM_RATE = heartBeatFrequency / (60);
+            BPM_RATE = heartBeatFrequency / (60+fps);
 
             // Adding Text
             Imgproc.putText(
@@ -331,17 +301,20 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
                     "BPM: " + BPM_RATE,          // Text to be added
                     new Point(10, 50),               // point
                     Core.FONT_HERSHEY_SIMPLEX,      // front face
-                    0.8,                               // front scale
-                    new Scalar(64, 64, 255),             // Scalar object for color
+                    2,                               // front scale
+                    new Scalar(255, 255, 255),             // Scalar object for color
                     1                                // Thickness
             );
 
             Log.i(TAG,"BPM: " + BPM_RATE);
+            Log.i(TAG,"BPM Current FPS: " + heartBeatFrequency / (60+fps));
 
         } else {
             Log.i(TAG,"NO BPM");
+            BPM_RATE=0;
         }
     }
+
     private void detectAndDisplay(Mat frame)
     {
         MatOfRect faces = new MatOfRect();
