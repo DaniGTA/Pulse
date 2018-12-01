@@ -85,7 +85,9 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         final Runnable runnableCode = new Runnable() {
             @Override
             public void run() {
-                fps = totalFrameCount;
+                if(totalFrameCount != 0) {
+                    fps = totalFrameCount;
+                }
                 TextView fpsTextView = findViewById(R.id.activity_text_show_fps);
                 fpsTextView.setText("FPS: " + fps);
 
@@ -222,5 +224,9 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         if(facesArray.length >= 1) {
             BPM_RATE = heartbeatChecker.getHeartRate(facesArray[0],frame);
         }
+    }
+
+    public static int getFps() {
+        return fps;
     }
 }

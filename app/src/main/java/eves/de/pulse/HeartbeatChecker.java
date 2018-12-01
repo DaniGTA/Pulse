@@ -20,6 +20,7 @@ public class HeartbeatChecker {
     private int bufferSize = 32;
     private FFT fft;
     private float BPM_RATE;
+    private int BPM_RATE_NONE_COUNTER = 0;
 
     HeartbeatChecker(){
         int sampleRate = bufferSize;
@@ -147,11 +148,25 @@ public class HeartbeatChecker {
             float BPM_RATE = heartBeatFrequency / 60;
 
             Log.i(TAG,"BPM: " + BPM_RATE);
+            BPM_RATE_NONE_COUNTER = 0;
             return BPM_RATE;
         } else {
             Log.i(TAG,"NO BPM");
+            BPM_RATE_NONE_COUNTER++;
+            if (BPM_RATE_NONE_COUNTER >= Startsite.getFps()*4) {
+                reset();
+            }
             return 0;
         }
+    }
+
+    /**
+     * Resets all values.
+     */
+    private void reset(){
+        BPM_RATE_NONE_COUNTER = 0;
+        BPM_RATE = 0;
+        floats.clear();
     }
 
     /**
