@@ -66,6 +66,18 @@ public class JavaCameraView extends CameraBridgeViewBase implements PreviewCallb
         super(context, attrs);
     }
 
+    public void turnOffTheFlash() {
+        Camera.Parameters params = mCamera.getParameters();
+        params.setFlashMode(params.FLASH_MODE_OFF);
+        mCamera.setParameters(params);
+    }
+
+    public void turnOnTheFlash() {
+        Camera.Parameters params = mCamera.getParameters();
+        params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+        mCamera.setParameters(params);
+    }
+
     protected boolean initializeCamera(int width, int height) {
         Log.d(TAG, "Initialize java camera");
         boolean result = true;

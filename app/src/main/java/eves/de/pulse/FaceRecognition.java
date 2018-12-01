@@ -83,7 +83,7 @@ public class FaceRecognition {
         }
 
         // detect faces
-        haarcascade_frontalface.detectMultiScale(grayFrame, faces, 1.1, 2, 2,
+        haarcascade_frontalface.detectMultiScale(grayFrame, faces, 1.1, 3, 2,
                 new Size(absoluteFaceSize, absoluteFaceSize), new Size());
 
         //return all detected faces

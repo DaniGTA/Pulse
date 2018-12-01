@@ -17,9 +17,9 @@ public class HeartbeatChecker {
     private static String TAG = "HeartBeatChecker";
 
     private ArrayList<Float> floats = new ArrayList<>();
-    private int bufferSize = 128;
+    private int bufferSize = 32;
     private FFT fft;
-
+    private float BPM_RATE;
 
     HeartbeatChecker(){
         int sampleRate = bufferSize;
@@ -32,10 +32,10 @@ public class HeartbeatChecker {
      * @return the rect for the forehead
      */
     private Rect getForehead(Rect rect){
-        float FORE_HEAD_DETECTION_PERCENTAGE = 40;
+        float FORE_HEAD_DETECTION_PERCENTAGE = 46;
 
-        Point start_point = new Point(rect.x + (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 50);
-        Point end_point = new Point((rect.x + rect.width) - (rect.width * (100 - FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 75);
+        Point start_point = new Point(rect.x + (rect.width * (FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 75);
+        Point end_point = new Point((rect.x + rect.width) - (rect.width * (FORE_HEAD_DETECTION_PERCENTAGE) / 100), rect.y + 90);
 
         return new Rect(start_point, end_point);
     }
@@ -62,17 +62,46 @@ public class HeartbeatChecker {
         drawForehead(mat,rectForeHead);
 
         Mat inputMatForHR = mat.submat(rectForeHead);
+        float NEW_BPM_RATE = getBPMFromArea(inputMatForHR);
+        if(NEW_BPM_RATE != 0) {
+            BPM_RATE = NEW_BPM_RATE;
+             // Adding Text
+             Imgproc.putText(
+                     mat,                          // Matrix obj of the image
+                     "BPM: " + BPM_RATE,          // Text to be added
+                     new Point(10, 50),               // point
+                     Core.FONT_HERSHEY_SIMPLEX,      // front face
+                     2,                               // front scale
+                     new Scalar(255, 255, 255),             // Scalar object for color
+                     1                                // Thickness
+             );
+
+         }
+        return BPM_RATE;
+    }
+
+    /**
+     * (This is very CPU intensive)
+     * @param rect face.
+     * @param mat current frame.
+     */
+    float getHeartRateFromArea(Rect rect, Mat mat){
+        drawForehead(mat,rect);
+
+        Mat inputMatForHR = mat.submat(rect);
         float BPM_RATE = getBPMFromArea(inputMatForHR);
-        // Adding Text
-        Imgproc.putText(
-                mat,                          // Matrix obj of the image
-                "BPM: " + BPM_RATE,          // Text to be added
-                new Point(10, 50),               // point
-                Core.FONT_HERSHEY_SIMPLEX,      // front face
-                2,                               // front scale
-                new Scalar(255, 255, 255),             // Scalar object for color
-                1                                // Thickness
-        );
+        if(BPM_RATE != 0) {
+            // Adding Text
+            Imgproc.putText(
+                    mat,                          // Matrix obj of the image
+                    "BPM: " + BPM_RATE,          // Text to be added
+                    new Point(10, 50),               // point
+                    Core.FONT_HERSHEY_SIMPLEX,      // front face
+                    2,                               // front scale
+                    new Scalar(255, 255, 255),             // Scalar object for color
+                    1                                // Thickness
+            );
+        }
         return BPM_RATE;
     }
 
@@ -82,14 +111,12 @@ public class HeartbeatChecker {
      * @return BPM
      */
     private float getBPMFromArea(Mat inputMatForHR){
-        float[] sample;
-        float BPM_RATE;
         float green_avg = getAvgGreen(inputMatForHR);
 
         if (floats.size() < bufferSize) {
             floats.add(green_avg);
         } else floats.remove(0);
-
+        float[] sample;
         sample = new float[floats.size()];
         for (int i = 0; i < floats.size(); i++) {
             float f = floats.get(i);
@@ -104,7 +131,7 @@ public class HeartbeatChecker {
             //    in.addEffect(bpf);
 
 
-            float heartBeatFrequency = 0;
+            float heartBeatFrequency = 20;
 //                        System.out.println("FFT Secsize : " + fft.specSize());
             for (int i = 0; i < fft.specSize(); i++) { // draw the line for frequency band i, scaling it up a bit so we can see it
                 heartBeatFrequency = Math.max(heartBeatFrequency, fft.getBand(i));
@@ -117,10 +144,9 @@ public class HeartbeatChecker {
             heartBeatFrequency = bw * heartBeatFrequency;
 
             //float BPM_RATE = heartBeatFrequency / (60);
-            BPM_RATE = heartBeatFrequency / (60+Startsite.getFPS());
+            float BPM_RATE = heartBeatFrequency / 60;
 
             Log.i(TAG,"BPM: " + BPM_RATE);
-            Log.i(TAG,"BPM Current FPS: " + heartBeatFrequency / (60+Startsite.getFPS()));
             return BPM_RATE;
         } else {
             Log.i(TAG,"NO BPM");

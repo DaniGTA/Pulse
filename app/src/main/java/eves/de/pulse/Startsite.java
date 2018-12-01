@@ -9,6 +9,8 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import org.opencv.android.BaseLoaderCallback;
@@ -16,13 +18,15 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.JavaCameraView;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-public class Startsite extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2 {
+public class Startsite extends AppCompatActivity implements CameraBridgeViewBase.CvCameraViewListener2, View.OnClickListener {
 
     private static String TAG = "Startsite";
     private JavaCameraView javaCameraView;
@@ -30,7 +34,7 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
     private HeartbeatChecker heartbeatChecker;
     private int totalFrameCount = 0;
     private static int fps = 0;
-
+    private int currentCameraIndex = 1;
     private Mat mRgba;
 
     private static float BPM_RATE;
@@ -101,11 +105,31 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         javaCameraView.setVisibility(SurfaceView.VISIBLE);
         javaCameraView.setCameraIndex(1);
         javaCameraView.setCvCameraViewListener(this);
+
+        Button btn = findViewById(R.id.camera_switch);
+        btn.setOnClickListener(this);
     }
 
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
+    }
+
+    /**
+     * Switch the view between front and back camera.
+     * @param v current view.
+     */
+    @Override
+    public void onClick(View v) {
+        javaCameraView.disableView();
+        if(currentCameraIndex == 0) {
+            javaCameraView.setCameraIndex(1);
+            currentCameraIndex = 1;
+        }else{
+            javaCameraView.setCameraIndex(0);
+            currentCameraIndex = 0;
+        }
+        javaCameraView.enableView();
     }
 
     @Override
@@ -151,13 +175,31 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         mRgba.release();
     }
 
+    /**
+     * Get the current camera frame.
+     * @param inputFrame current camera image
+     * @return displayed image
+     */
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
         totalFrameCount++;
         Mat input = inputFrame.rgba().clone();
-
+        //Core.flip(input,input,0);
         try {
-            detectAndDisplay(input);
+            if(currentCameraIndex == 1) {
+                //Front camera don't have a flash and have a mirror effect.
+                javaCameraView.turnOffTheFlash();
+                Core.flip(input,input,1);
+                detectAndDisplay(input);
+            }else {
+                //Back camera has a flash but no mirror effect.
+                javaCameraView.turnOnTheFlash();
+                Point start_point = new Point(input.size().width / 2 + 40, input.size().height / 2 + 40);
+                Point end_point = new Point(input.size().width / 2 - 40, input.size().height / 2 - 40);
+
+                BPM_RATE = heartbeatChecker.getHeartRateFromArea(new Rect(start_point, end_point), input);
+            }
+
         }catch (org.opencv.core.CvException unknown){
             Log.i(TAG,"Cant detect anything");
         }
@@ -167,6 +209,7 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
 
     /**
      * Detect faces and draw them to the frame.
+     * And request the BPM from the first detected face.
      * @param frame
      * The frame to scan.
      */
@@ -179,9 +222,5 @@ public class Startsite extends AppCompatActivity implements CameraBridgeViewBase
         if(facesArray.length >= 1) {
             BPM_RATE = heartbeatChecker.getHeartRate(facesArray[0],frame);
         }
-    }
-
-    static public int getFPS(){
-        return fps;
     }
 }
